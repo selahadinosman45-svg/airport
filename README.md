@@ -22,3 +22,7 @@ No repository secrets are needed. GitHub Pages is static hosting, so weather is 
 - Every international airport page retains an Escape Routes pop-up. Where a complete airport-specific escape route exists in the supplied records, it is shown. Where only an exit point is available, the pop-up identifies that exit point and explicitly states that the full route was not supplied; no route is invented from an exit fix alone.
 - Buttons use the original soft, rounded neutral styling in light and dark themes.
 - All source procedures are historical operational references and must be checked against current approved charts and company documentation before use.
+
+## Exit-point escape routes
+
+Airport escape-route pop-ups now include the user-supplied procedures for KONET, TORBA/LAKBE, ALEMU, RUDOL, EKBUL, DAGAP, BRO and ALRAP. Routes are assigned to airport destinations using the recorded EXIT point (including LAKBE→TORBA and MVA→MAV aliases). ARSHI→ASOLE and MAV→ALEMU are shown only as supplied exit-point references because no further routing was provided. EGBIM is likewise identified as an exit point without inventing a route. These are historical/user-supplied operational references and must be checked against current approved company procedures and charts.

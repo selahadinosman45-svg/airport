@@ -75,20 +75,16 @@ function domesticSection(raw,kind){
   const m=text.match(/ADD\s*[–-][\s\S]*?(?=\nFIX\b|\nETP\s+PNR\b|\nDepressurization escape route|$)/i);
   return m?m[0].trim():'No SID / route details were present in this airport source.';
 }
+const DOMESTIC_DOCUMENT_PAGES={HAJJ:2,HADR:3,HABD:4,HAGN:5,HALL:6,HASR:7,HAMK:8,HAAX:9,HALA:10,HAJM:11,HAAM:12,HASM:13,HADC:14,HASO:15,HANK:16,HAGM:17,HADD:18,HAGB:19,HABC:20,HAGO:22,HAKD:23,HCGR:24,HCMF:25,HCMH:26,HUEN:27,HJWW:28};
 function domesticBriefingPanel(x){
-  const raw=String(x.domesticSource||'');
-  const section=(start,end)=>{const a=raw.search(start);if(a<0)return '';const rest=raw.slice(a);const b=end?rest.search(end):-1;return rest.slice(0,b<0?undefined:b).trim()};
-  const blocks=[
-    ['Runway & minima',section(/\bRWY\b/i,/\nMSA\b/i)],
-    ['MSA · MAP · Frequencies',section(/\bMSA\b/i,/\nGrid Mora\b/i)],
-    ['Airport elevations',section(/Grid Mora/i,/\nADD\s*[–-]/i)],
-    ['Routes & procedures',section(/ADD\s*[–-]/i,/\nDepressurization escape route/i)],
-    ['Depressurization escape route',domesticSection(raw,'escape')]
-  ].filter(a=>a[1]);
-  return `<div class="sec"><i style="background:var(--muted)"></i>Domestic briefing · source card</div>
-  <div class="domestic-card"><div class="domestic-card-title"><div><div class="sm">${escHTML(x.subtitle||x.code)}</div><h3>${escHTML(x.code)} · ${escHTML(x.icao)}</h3></div><span class="source-date">09 SEP 2024</span></div>
-  <div class="domestic-card-grid">${blocks.map(([h,v])=>`<section class="domestic-data"><h4>${h}</h4><pre>${escHTML(v)}</pre></section>`).join('')}</div>
-  <p class="sm domestic-warning">Source: Airport Information, 09 September 2024. Historical reference only; verify all runway, minima, route and escape procedures against current approved charts and company documentation.</p></div>`;
+  const page=DOMESTIC_DOCUMENT_PAGES[x.icao];
+  const src=page?`./domestic-pages/${encodeURIComponent(x.icao)}.jpg`:'';
+  return `<div class="sec"><i style="background:var(--muted)"></i>Domestic briefing · original document</div>
+  <div class="domestic-document">
+    <div class="domestic-document-head"><div><div class="sm">AIRPORT INFORMATION · 09 SEP 2024</div><h3>${escHTML(x.subtitle||x.code)} · ${escHTML(x.icao)}</h3></div><span class="source-date">${page?'PDF PAGE '+page:'SOURCE PAGE UNAVAILABLE'}</span></div>
+    ${page?`<a class="domestic-document-open" href="${src}" target="_blank" rel="noopener" aria-label="Open full-size ${escHTML(x.icao)} airport briefing document"><img src="${src}" alt="Original airport briefing document for ${escHTML(x.code)} ${escHTML(x.icao)}, including runway data, minima, MSA, MAP, frequencies, elevations, routes and escape procedures" loading="lazy" decoding="async"></a><div class="domestic-document-actions"><a class="action-btn" href="${src}" target="_blank" rel="noopener">Open full-size document ↗</a><span class="sm">Tap the document to zoom in</span></div>`:`<div class="domestic-document-missing">No matching airport page was found in the supplied September 2024 source PDF. No operational data has been reconstructed or guessed.</div>`}
+    <p class="sm domestic-warning">Source: Airport Information, 09 September 2024. Historical reference only. Verify all runway, minima, route and escape procedures against current approved charts and company documentation.</p>
+  </div>`;
 }
 function procedureModal(x,kind){
   const title=kind==='sid'?'SIDs / departure procedures':'Escape routes';
@@ -97,7 +93,7 @@ function procedureModal(x,kind){
   const value=kind==='sid'?(x.sids||x.info?.SID||(isDomestic?domesticSection(x.domesticSource,'routes'):'No SID details were provided in the source briefing.')):(x.escape|| (isDomestic?domesticSection(x.domesticSource,'escape'):x.exit?`Identified departure/flight-plan exit point: ${x.exit}.\n\nThe supplied airport briefing does not contain a complete depressurization escape-route procedure for this destination. The exit point alone is not sufficient to construct a safe route. Use current approved company escape-route documentation and charts.`:'No exit point or complete escape-route procedure is present in the supplied airport records. Do not infer a route.'));
   const old=document.querySelector('.proc-overlay');if(old)old.remove();
   const overlay=document.createElement('div');overlay.className='proc-overlay';
-  overlay.innerHTML=`<div class="proc-modal" role="dialog" aria-modal="true" aria-label="${title}"><div class="proc-head"><div><div class="sm">${x.code} · ${x.icao}</div><h2>${title}</h2></div><button class="ib proc-close" aria-label="Close">×</button></div><div class="proc-body"><pre>${escHTML(value)}</pre><p class="sm">Operational reference only. Confirm current AIP charts, NOTAMs, aircraft performance and company-approved procedures before flight.</p></div></div>`;
+  overlay.innerHTML=`<div class="proc-modal" role="dialog" aria-modal="true" aria-label="${title}"><div class="proc-head"><div><div class="sm">${x.code} · ${x.icao}</div><h2>${title}</h2></div><button class="ib proc-close" aria-label="Close">×</button></div><div class="proc-body"><pre>${escHTML(value)}</pre>${kind==='escape'&&x.escape_source?`<p class="sm">Source: ${escHTML(x.escape_source)}.</p>`:''}<p class="sm">Operational reference only. Confirm current AIP charts, NOTAMs, aircraft performance and company-approved procedures before flight.</p></div></div>`;
   document.body.appendChild(overlay);
   overlay.querySelector('.proc-close').onclick=()=>overlay.remove();
   overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};

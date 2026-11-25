@@ -69,14 +69,16 @@ select{font:inherit;background:rgba(127,135,148,.14);color:var(--text);border:0;
 .proc-body .sm{margin-top:16px}
 @media(max-width:640px){.action-btn{flex:1}.proc-overlay{padding:10px}.proc-modal{max-height:88vh;border-radius:18px}}
 
-/* Domestic briefing cards — matched to the original soft, rounded airport UI */
-.domestic-card{background:var(--card);border-radius:28px;padding:20px;box-shadow:var(--sh);margin-bottom:16px}
-.domestic-card-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.domestic-card-title h3{font-size:23px;line-height:1.2;margin:3px 0 0;letter-spacing:-.03em}
-.source-date{font-size:10px;font-weight:700;letter-spacing:.09em;color:var(--muted);background:rgba(127,135,148,.13);padding:7px 10px;border-radius:99px;white-space:nowrap}
-.domestic-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.domestic-data{min-width:0;background:rgba(127,135,148,.12);border-radius:20px;padding:14px 16px}
-.domestic-data h4{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:700}
-.domestic-data pre{white-space:pre-wrap;overflow-wrap:anywhere;font:600 13px/1.55 Inter,system-ui,sans-serif;margin:0;color:var(--text)}
-.domestic-warning{margin:14px 2px 0;line-height:1.5}
-@media(max-width:560px){.domestic-card{padding:15px;border-radius:23px}.domestic-card-grid{grid-template-columns:1fr}.domestic-data{border-radius:17px}.domestic-card-title h3{font-size:20px}}
+
+
+/* Domestic briefing: preserve each airport's original source-document layout */
+.domestic-document{background:var(--card);border-radius:28px;padding:18px;box-shadow:var(--sh);margin-bottom:16px;overflow:hidden}
+.domestic-document-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:2px 2px 14px;border-bottom:1px solid var(--line)}
+.domestic-document-head h3{font-size:19px;line-height:1.25;letter-spacing:-.025em;margin:4px 0 0}
+.domestic-document-open{display:block;background:#fff;border:1px solid rgba(15,17,21,.08);border-radius:12px;padding:8px;text-align:center;overflow:hidden}
+.domestic-document-open img{display:block;width:100%;height:auto;max-height:none;object-fit:contain;border-radius:3px}
+.domestic-document-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.domestic-document-actions .action-btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.domestic-document-missing{padding:22px;border-radius:16px;background:rgba(127,135,148,.12);color:var(--muted)}
+.domestic-document .domestic-warning{margin:14px 2px 0;line-height:1.55}
+@media(max-width:560px){.domestic-document{padding:12px;border-radius:23px}.domestic-document-head h3{font-size:17px}.domestic-document-open{padding:4px}}
