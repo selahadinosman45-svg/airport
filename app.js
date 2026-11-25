@@ -3,7 +3,7 @@ const AWC='https://aviationweather.gov/api/data/',AP=D.filter(x=>x.icao);
 const ld=(k,f)=>{try{return JSON.parse(localStorage[k])}catch(e){return f}},sv=(k,v)=>{try{localStorage[k]=JSON.stringify(v)}catch(e){}};
 let pins=ld('pins',[]),recent=ld('recent',[]),chk=ld('chk',{}),tab='ov',onWx=null;
 D.forEach(x=>x.text=(x.code+' '+x.icao+' '+x.subtitle+' '+(x.html||'').replace(/<[^>]+>/g,' ')).toLowerCase());
-const catOf=x=>((x.info&&x.info.CAT||'').match(/\b[ABC]\b/)||['?'])[0];
+const catOf=x=>x.cat||'?',CT=window.CATS,LL={HAAB:[8.98,38.80]};AP.forEach(x=>LL[x.icao]=[x.lat,x.lon]);
 
 /* splash + theme */
 const sp=$('#splash');let seen=false;try{seen=sessionStorage.seen}catch(e){}
@@ -14,31 +14,28 @@ setTh(document.documentElement.dataset.theme||'light');th.onclick=()=>setTh(docu
 /* weather */
 const cache={};
 async function getWx(icao,force){
-  const c=cache[icao];if(!force&&c&&Date.now()-c.t<6e5)return c.d;
-  const j=async u=>{const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw 0;const t=await r.text();return t?JSON.parse(t):[]};
-  const [m,t]=await Promise.all([j(`${AWC}metar?ids=${icao}&format=json`),j(`${AWC}taf?ids=${icao}&format=json`).catch(()=>[])]);
-  const d=m[0]?{m:m[0],taf:t[0]&&(t[0].rawTAF||t[0].rawTaf)}:null;cache[icao]={t:Date.now(),d};return d;
-}
-const pad=n=>String(n).padStart(3,'0');
-function parse(m){const ce=(m.clouds||[]).find(c=>['BKN','OVC','OVX'].includes(c.cover));
-  return{wind:m.wspd==null?'—':(m.wdir==='VRB'?'VRB':pad(m.wdir)+'°')+' / '+m.wspd+(m.wgst?'G'+m.wgst:'')+' kt',vis:m.visib==null?'—':m.visib+' SM',
-  temp:m.temp==null?'—':Math.round(m.temp)+'° / '+Math.round(m.dewp)+'°',qnh:m.altim?Math.round(m.altim)+' hPa':'—',ceil:ce?ce.cover+' '+ce.base+' ft':'No ceiling',
-  cat:m.fltCat||'',age:m.obsTime?Math.max(0,Math.round((Date.now()/1000-m.obsTime)/60)):null}}
-const ago=a=>a==null?'':a<90?`${a} min ago`:`${Math.round(a/60)} h ago`;
+  const c=cache[icao];if(!force&&c&&Date.now()-c.t<6e5)return c.d;const [la,lo]=LL[icao];
+  const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&current=temperature_2m,dew_point_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,visibility,cloud_cover,weather_code&wind_speed_unit=kn&timezone=GMT`,{cache:'no-store'});
+  if(!r.ok)throw 0;const d=(await r.json()).current;if(!d)throw 0;cache[icao]={t:Date.now(),d};return d}
+const WMO=c=>c===0?'Clear':c<=2?'Partly cloudy':c===3?'Overcast':c<=48?'Fog':c<=57?'Drizzle':c<=67?'Rain':c<=77?'Snow':c<=82?'Rain showers':c<=86?'Snow showers':'Thunderstorm';
+const pad=n=>String(n).padStart(3,'0'),R=Math.round;
+const ago=a=>a<2?'just now':a<90?`${a} min ago`:`${R(a/60)} h ago`;
 const wxWidget=(icao,cls='')=>`<div class="w g wxw ${cls}" data-icao="${icao}"><h4>Weather · ${icao}<button class="rf">Refresh</button></h4><div class="wxb sm">Loading…</div></div>`;
 async function fillWx(el,force){
   const icao=el.dataset.icao,b=el.querySelector('.wxb'),rf=el.querySelector('.rf');rf.classList.add('spin');
-  try{const d=await getWx(icao,force);if(!d)throw 0;const p=parse(d.m);b.className='wxb';
-    b.innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="chip ${p.cat}">${p.cat||'N/A'}</span><span class="sm">Observed ${ago(p.age)} · refreshed ${new Date().toISOString().slice(11,16)}Z</span></div>
-    <div class="wx"><div><span>Wind</span><b>${p.wind}</b></div><div><span>Visibility</span><b>${p.vis}</b></div><div><span>Temp / Dew</span><b>${p.temp}</b></div><div><span>QNH</span><b>${p.qnh}</b></div><div><span>Ceiling</span><b>${p.ceil}</b></div></div>
-    <pre class="raw">${d.m.rawOb||''}${d.taf?'\n\n'+d.taf:''}</pre>`;if(onWx)onWx(d.m);
-  }catch(e){b.className='wxb sm';b.innerHTML=`Weather unavailable for ${icao} (offline, or no METAR issued). <a href="https://aviationweather.gov/data/metar/?ids=${icao}" target="_blank" rel="noopener">Open on aviationweather.gov</a>`}
+  try{const d=await getWx(icao,force),gs=R(d.wind_gusts_10m),sp=R(d.wind_speed_10m),age=Math.max(0,R((Date.now()-Date.parse(d.time+'Z'))/6e4));b.className='wxb';
+    b.innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="chip" style="background:var(--text);color:var(--bg)">${WMO(d.weather_code)}</span><span class="sm">Updated ${ago(age)} · refreshed ${new Date().toISOString().slice(11,16)}Z</span></div>
+    <div class="wx"><div><span>Wind</span><b>${sp<1?'Calm':pad(R(d.wind_direction_10m))+'° / '+sp+(gs>sp+5?'G'+gs:'')+' kt'}</b></div><div><span>Visibility</span><b>${d.visibility>=10000?'10+ km':(d.visibility/1000).toFixed(1)+' km'}</b></div><div><span>Temp / Dew</span><b>${R(d.temperature_2m)}° / ${R(d.dew_point_2m)}°</b></div><div><span>Pressure</span><b>${R(d.pressure_msl)} hPa</b></div><div><span>Cloud cover</span><b>${d.cloud_cover}%</b></div></div>
+    <p class="sm" style="margin:12px 0 0">Model data from Open-Meteo, not a METAR. <a href="https://aviationweather.gov/data/metar/?ids=${icao}&taf=1" target="_blank" rel="noopener" style="color:inherit">Raw METAR / TAF ↗</a></p>`;
+    if(onWx)onWx({wdir:d.wind_direction_10m,wspd:sp,wgst:gs>sp+5?gs:0});
+  }catch(e){b.className='wxb sm';b.innerHTML=`Weather could not be loaded (check your connection and tap Refresh). <a href="https://aviationweather.gov/data/metar/?ids=${icao}&taf=1" target="_blank" rel="noopener" style="color:inherit">Open METAR ↗</a>`}
   rf.classList.remove('spin')}
 const bindWx=r=>r.querySelectorAll('.wxw').forEach(el=>{fillWx(el);el.querySelector('.rf').onclick=()=>fillWx(el,true)});
 
 /* clocks */
-const off=v=>{const m=(v||'').match(/([+-]?)\s*(\d+)(?::(\d+))?/);return m?(m[1]==='-'?-1:1)*(+m[2]+(+m[3]||0)/60):null};
-const clk=()=>document.querySelectorAll('[data-off]').forEach(e=>{e.textContent=new Date(Date.now()+ +e.dataset.off*36e5).toISOString().slice(11,16)});
+const utcLbl=tz=>{try{const p=new Intl.DateTimeFormat('en-US',{timeZone:tz,timeZoneName:'shortOffset'}).formatToParts(new Date()).find(a=>a.type==='timeZoneName').value;return p==='GMT'?'UTC+0':p.replace('GMT','UTC')}catch(e){return ''}};
+const tm=tz=>new Date().toLocaleTimeString('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false});
+const clk=()=>document.querySelectorAll('[data-tz]').forEach(e=>e.textContent=tm(e.dataset.tz));
 setInterval(clk,15000);
 
 /* nav */
@@ -49,15 +46,15 @@ const mark=()=>list.querySelectorAll('a').forEach(a=>a.classList.toggle('on',a.d
 
 /* home */
 function home(){
-  onWx=null;const tiles=a=>a.map(x=>`<a class="w tile" href="#${x.id}"><div class="sm">${x.flag} ${x.icao}</div><div class="big">${x.code}</div><div class="sm">${x.subtitle.replace(x.icao,'').replace(/^[\s/]+/,'').split('/')[0]||'&nbsp;'}</div></a>`).join('');
-  const ni=AP.reduce((a,x)=>a+x.inb.length,0),no=AP.reduce((a,x)=>a+x.out.length,0),cs={A:0,B:0,C:0};AP.forEach(x=>{const c=catOf(x);if(cs[c]!==undefined)cs[c]++});
+  onWx=null;const tiles=a=>a.map(x=>`<a class="w tile" href="#${x.id}"><div class="sm">${x.flag} ${x.icao}</div><div class="big">${x.code}</div><div class="sm"><b>${utcLbl(x.tz)}</b>${x.exit?' · Exit '+x.exit:''}</div></a>`).join('');
+  const ni=AP.reduce((a,x)=>a+x.inb.length,0),no=AP.reduce((a,x)=>a+x.out.length,0),cs={A:Object.keys(CT.A).length,B:Object.keys(CT.B).length,C:Object.keys(CT.C).length},mx=Math.max(...Object.values(cs));
   const rec=recent.map(i=>D.find(x=>x.id===i)).filter(Boolean),pn=AP.filter(x=>pins.includes(x.id));
   view.innerHTML=`<div class="hero"><h2>Good day, Captain</h2><p>Airport briefings, weather and reference in one place.</p></div>
   <div class="grid g2">
-   <div class="w"><h4>Time</h4><div style="display:flex;gap:28px"><div><div class="big" data-off="0"></div><div class="sm">UTC</div></div><div><div class="big" data-off="3"></div><div class="sm">Addis · UTC+3</div></div></div></div>
+   <div class="w"><h4>Time</h4><div style="display:flex;gap:28px"><div><div class="big" data-tz="UTC"></div><div class="sm">UTC</div></div><div><div class="big" data-tz="Africa/Addis_Ababa"></div><div class="sm">Addis · UTC+3</div></div></div></div>
    <div class="w"><h4>Library</h4><div style="display:flex;gap:26px"><div><div class="big">${AP.length}</div><div class="sm">Airports</div></div><div><div class="big">${D.filter(x=>x.group==='Addis FIR').length}</div><div class="sm">FIR sheets</div></div><div><div class="big">${pn.length}</div><div class="sm">Pinned</div></div></div></div>
    <div class="w"><h4>Routes</h4><div style="display:flex;gap:26px"><div><div class="big" style="color:var(--in)">${ni}</div><div class="sm">↘ Inbound</div></div><div><div class="big" style="color:var(--out)">${no}</div><div class="sm">↗ Outbound</div></div></div></div>
-   <div class="w"><h4>Categories</h4>${['A','B','C'].map(c=>`<div style="display:flex;justify-content:space-between"><span>Category ${c}</span><b>${cs[c]}</b></div><div class="mini"><i style="width:${cs[c]/AP.length*100}%"></i></div>`).join('<div style="height:6px"></div>')}</div>
+   <div class="w"><h4>Categories</h4>${['A','B','C'].map(c=>`<div style="display:flex;justify-content:space-between"><span>Category ${c}</span><b>${cs[c]}</b></div><div class="mini"><i style="width:${cs[c]/mx*100}%"></i></div>`).join('<div style="height:6px"></div>')}<div class="sm" style="margin-top:8px">Cat C: ${Object.values(CT.C).map(n=>n[0]+n.slice(1).toLowerCase()).join(' · ')}</div></div>
    ${wxWidget('HAAB','span')}
   </div>
   ${rec.length?`<div class="sec"><i style="background:var(--muted)"></i>Recently viewed</div><div class="grid">${tiles(rec)}</div>`:''}
@@ -77,22 +74,22 @@ function steps(x,k,list){
 function sync(root){const gs={};root.querySelectorAll('.step').forEach(e=>{(gs[e.dataset.g]=gs[e.dataset.g]||[]).push(e);e.classList.remove('next')});
   Object.entries(gs).forEach(([g,a])=>{const f=a.find(e=>!e.classList.contains('done'));if(f)f.classList.add('next');const s=root.querySelector(`.sec[data-g="${g}"] b`);if(s)s.textContent=a.filter(e=>e.classList.contains('done')).length+' / '+a.length})}
 function airport(x){
-  const i=x.info||{},v=k=>(i[k]||'').trim(),ap=!!x.icao,o=off(v('UTC')),rw=[...new Set((v('RW').match(/\b\d{1,2}(?=[LRC]*\b)/g)||[]))];
+  const i=x.info||{},v=k=>(i[k]||'').trim(),ap=!!x.icao,rw=[...new Set((v('RW').match(/\b\d{1,2}(?=[LRC]*\b)/g)||[]))];
   const tabs=[['ov','Overview'],...(x.inb&&x.inb.length?[['in','Inbound',x.inb.length]]:[]),...(x.out&&x.out.length?[['out','Outbound',x.out.length]]:[])];
   view.innerHTML=`<div class="col"><div class="bar"><a class="ib" href="#" aria-label="Back">‹</a><div>${ap?`<button class="ib pin ${pins.includes(x.id)?'on':''}" aria-label="Pin">★</button>`:''}</div></div>
-  <h1 class="t">${x.flag} ${x.code}<br>Briefing</h1><p class="sub">${x.subtitle||''}${x.status?` · <span class="chip">${x.status}</span>`:''}</p>
+  <h1 class="t">${x.flag} ${x.code}<br>Briefing</h1><p class="sub">${x.subtitle||''} <span class="chip" style="background:var(--text);color:var(--bg)">${utcLbl(x.tz)}</span>${x.status?` · <span class="chip">${x.status}</span>`:''}</p>
   ${ap?`<div class="tabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}${t[2]?`<i class="${t[0]}">${t[2]}</i>`:''}</button>`).join('')}<span class="d">${new Date().toUTCString().slice(0,11)}</span></div>`:''}<div id="tb"></div></div>`;
   const p=view.querySelector('.pin');if(p)p.onclick=()=>{pins=pins.includes(x.id)?pins.filter(a=>a!==x.id):[...pins,x.id];sv('pins',pins);p.classList.toggle('on')};
   const tb=$('#tb');
   function draw(){onWx=null;
     if(!ap){tb.innerHTML=`<div class="w doc">${x.html}</div>`;return}
     if(tab==='ov'){
-      const rt=['SID','DEP','EXIT'].filter(k=>v(k));
+      const rt=['SID','DEP','EXIT'].filter(k=>v(k)&&!(k==='DEP'&&v('DEP')===v('EXIT')));
       tb.innerHTML=`<div class="grid g2">${wxWidget(x.icao,'span')}
-      ${o!=null?`<div class="w"><h4>Local time</h4><div style="display:flex;gap:24px"><div><div class="big" data-off="${o}"></div><div class="sm">Local · UTC${v('UTC')}</div></div><div><div class="big" data-off="0"></div><div class="sm">UTC</div></div></div></div>`:''}
-      <div class="w"><h4>Airport</h4><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip" style="background:var(--text);color:var(--bg)">CAT ${catOf(x)}</span>${v('TL')?`<span class="chip">TL ${v('TL')}</span>`:''}${v('ELEV')?`<span class="chip">ELEV ${v('ELEV')}</span>`:''}</div><div class="sm" style="margin-top:8px">${x.icao}${v('OPS')?' · '+v('OPS'):''}</div></div>
+      ${x.tz?`<div class="w"><h4>Local time</h4><div style="display:flex;gap:24px"><div><div class="big" data-tz="${x.tz}"></div><div class="sm">Local · ${utcLbl(x.tz)}</div></div><div><div class="big" data-tz="UTC"></div><div class="sm">UTC</div></div></div></div>`:''}
+      <div class="w"><h4>Airport</h4><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip" style="background:var(--text);color:var(--bg)">CAT ${x.cat||'—'}</span>${v('TL')?`<span class="chip">TL ${v('TL')}</span>`:''}${v('ELEV')?`<span class="chip">ELEV ${v('ELEV')}</span>`:''}</div><div class="sm" style="margin-top:8px">${x.icao}${v('OPS')?' · '+v('OPS'):''}</div></div>
       ${rw.length?`<div class="w" id="xw"><h4>Wind components<select>${rw.map(r=>`<option value="${r}">RWY ${r}</option>`).join('')}</select></h4><div class="big" id="xw1">—</div><div class="sm" id="xw2">Waiting for weather…</div></div>`:''}
-      ${rt.length?`<div class="w" style="background:var(--gout)"><h4>↗ Departure from ${x.code}</h4><div class="route">${rt.map(k=>`<div><small>${k}</small>${v(k)}</div>`).join('<span class="a">→</span>')}</div></div>`:''}
+      ${rt.length?`<div class="w" style="background:var(--gout)"><h4>↗ Addis departure · exit point</h4><div class="route">${rt.map(k=>`<div><small>${k}</small><span ${k==='EXIT'?'style="font-size:22px"':''}>${v(k)}</span></div>`).join('<span class="a">→</span>')}</div></div>`:''}
       <div class="w"><h4>Routes</h4><div class="legend"><span style="--c:var(--in)"><a href="#" data-go="in" style="color:inherit">${x.inb.length} inbound</a></span><span style="--c:var(--out)"><a href="#" data-go="out" style="color:inherit">${x.out.length} outbound</a></span></div></div></div>
       ${Object.keys(i).length?`<div class="sec"><i style="background:var(--muted)"></i>Airport data</div><div class="w"><div class="kv">${Object.entries(i).map(([k,a])=>`<div><span>${k}</span><b>${a}</b></div>`).join('')}</div></div>`:''}
       ${x.notes.trim()?`<div class="sec"><i style="background:var(--muted)"></i>Notes</div><div class="w doc">${x.notes}</div>`:''}`;
