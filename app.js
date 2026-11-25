@@ -1,8 +1,8 @@
 const D=window.BRIEFINGS,$=s=>document.querySelector(s),list=$('#list'),view=$('#view');
-const AWC='https://aviationweather.gov/api/data/',AP=D.filter(x=>x.icao&&x.group!=='Domestic Briefing');
+const AWC='https://aviationweather.gov/api/data/',AP=D.filter(x=>x.icao);
 const ld=(k,f)=>{try{return JSON.parse(localStorage[k])}catch(e){return f}},sv=(k,v)=>{try{localStorage[k]=JSON.stringify(v)}catch(e){}};
 let pins=ld('pins',[]),recent=ld('recent',[]),chk=ld('chk',{}),tab='ov',onWx=null;
-D.forEach(x=>x.text=(x.code+' '+x.icao+' '+x.subtitle+' '+(x.html||'').replace(/<[^>]+>/g,' ')+' '+(x.sourceText||'')+' '+(x.sidText||'')+' '+(x.escapeText||'')).toLowerCase());
+D.forEach(x=>x.text=(x.code+' '+x.icao+' '+x.subtitle+' '+(x.html||'').replace(/<[^>]+>/g,' ')).toLowerCase());
 const catOf=x=>x.cat||'?',CT=window.CATS,LL={HAAB:[8.98,38.80]};AP.forEach(x=>LL[x.icao]=[x.lat,x.lon]);
 
 /* splash + theme */
@@ -52,17 +52,60 @@ function home(){
   view.innerHTML=`<div class="hero"><h2>Good day, Captain</h2><p>Airport briefings, weather and reference in one place.</p></div>
   <div class="grid g2">
    <div class="w"><h4>Time</h4><div style="display:flex;gap:28px"><div><div class="big" data-tz="UTC"></div><div class="sm">UTC</div></div><div><div class="big" data-tz="Africa/Addis_Ababa"></div><div class="sm">Addis · UTC+3</div></div></div></div>
-   <div class="w"><h4>Library</h4><div style="display:flex;gap:26px"><div><div class="big">${AP.length+D.filter(x=>x.group==='Domestic Briefing').length}</div><div class="sm">Airports</div></div><div><div class="big">${D.filter(x=>x.group==='Addis FIR').length}</div><div class="sm">FIR sheets</div></div><div><div class="big">${pn.length}</div><div class="sm">Pinned</div></div></div></div>
+   <div class="w"><h4>Library</h4><div style="display:flex;gap:26px"><div><div class="big">${AP.length}</div><div class="sm">Airports</div></div><div><div class="big">${D.filter(x=>x.group==='Addis FIR').length}</div><div class="sm">FIR sheets</div></div><div><div class="big">${pn.length}</div><div class="sm">Pinned</div></div></div></div>
    <div class="w"><h4>Routes</h4><div style="display:flex;gap:26px"><div><div class="big" style="color:var(--in)">${ni}</div><div class="sm">↘ Inbound</div></div><div><div class="big" style="color:var(--out)">${no}</div><div class="sm">↗ Outbound</div></div></div></div>
    <div class="w"><h4>Categories</h4>${['A','B','C'].map(c=>`<div style="display:flex;justify-content:space-between"><span>Category ${c}</span><b>${cs[c]}</b></div><div class="mini"><i style="width:${cs[c]/mx*100}%"></i></div>`).join('<div style="height:6px"></div>')}<div class="sm" style="margin-top:8px">Cat C: ${Object.values(CT.C).map(n=>n[0]+n.slice(1).toLowerCase()).join(' · ')}</div></div>
    ${wxWidget('HAAB','span')}
   </div>
   ${rec.length?`<div class="sec"><i style="background:var(--muted)"></i>Recently viewed</div><div class="grid">${tiles(rec)}</div>`:''}
   ${pn.length?`<div class="sec"><i style="background:#f5b301"></i>Pinned</div><div class="grid">${tiles(pn)}</div>`:''}
-  <div class="sec"><i style="background:var(--muted)"></i>International airports</div><div class="grid">${tiles(AP)}</div>
-  <div class="sec"><i style="background:var(--ok)"></i>Domestic briefing <b>${D.filter(x=>x.group==='Domestic Briefing').length}</b></div><div class="grid">${tiles(D.filter(x=>x.group==='Domestic Briefing'))}</div>`;
+  <div class="sec"><i style="background:var(--muted)"></i>Domestic Briefing</div><div class="grid">${tiles(D.filter(x=>x.group==='Domestic Briefing'))}</div>
+  <div class="sec"><i style="background:var(--muted)"></i>All airports</div><div class="grid">${tiles(AP)}</div>`;
   clk();bindWx(view)}
 
+/* source-grounded operational pop-ups */
+const escHTML=s=>String(s||'Not provided in the supplied briefing.').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function procedureModal(x,kind){
+  const title=kind==='sid'?'SIDs / departure procedures':'Escape routes';
+  const value=kind==='sid'?(x.sids||x.info?.SID||'No SID details were provided in the source briefing.'):(x.escape||'No airport-specific escape route was supplied. Check the Addis FIR escape-route briefing and current company procedures.');
+  const old=document.querySelector('.proc-overlay');if(old)old.remove();
+  const overlay=document.createElement('div');overlay.className='proc-overlay';
+  overlay.innerHTML=`<div class="proc-modal" role="dialog" aria-modal="true" aria-label="${title}"><div class="proc-head"><div><div class="sm">${x.code} · ${x.icao}</div><h2>${title}</h2></div><button class="ib proc-close" aria-label="Close">×</button></div><div class="proc-body"><pre>${escHTML(value)}</pre><p class="sm">Operational reference only. Confirm current AIP charts, NOTAMs, aircraft performance and company-approved procedures before flight.</p></div></div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('.proc-close').onclick=()=>overlay.remove();
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
+}
+function notamWeatherPanel(x){
+  const q=encodeURIComponent(`Explain these aviation NOTAMs for ${x.icao} in plain language. Preserve runway, taxiway, navaid, time, altitude, and validity details. Flag anything safety-critical and do not infer missing information.`);
+  return `<div class="w span"><h4>NOTAM briefing · ${x.icao}</h4><p class="sm">Live NOTAM availability depends on the official provider and region. Open the official search, then paste the NOTAM text below for an AI-assisted plain-language explanation.</p><p><a href="https://www.notams.faa.gov/dinsQueryWeb/" target="_blank" rel="noopener">FAA NOTAM search ↗</a> · <a href="https://www.eurocontrol.int/service/european-ais-database" target="_blank" rel="noopener">European AIS database ↗</a></p><textarea class="notam-input" placeholder="Paste NOTAM text here…" rows="3"></textarea><div class="action-row"><button class="action-btn explain-notam">Explain NOTAM with ChatGPT ↗</button><span class="sm">AI explanation requires an internet connection and your confirmation in ChatGPT.</span></div></div>
+  <div class="w span"><h4>Weather briefing · METAR / TAF</h4><p class="sm">Fetch the latest available raw METAR and TAF from Aviation Weather Center. Use the AI action to translate abbreviations into plain language.</p><div class="action-row"><button class="action-btn fetch-metar">Fetch METAR / TAF</button><button class="action-btn explain-weather">Explain weather with ChatGPT ↗</button></div><pre class="metar-raw sm">METAR / TAF not fetched yet.</pre></div>`;
+}
+function bindNotamWeather(root,x){
+ const ni=root.querySelector('.notam-input');
+ root.querySelector('.explain-notam')?.addEventListener('click',()=>{
+   const val=ni.value.trim();if(!val){ni.focus();return}
+   const prompt=`Explain this NOTAM for ${x.icao} in plain language. Keep all operational details exact, identify affected facilities and validity, and clearly mark uncertainty. Do not invent missing data:\n\n${val}`;
+   window.open('https://chatgpt.com/?q='+encodeURIComponent(prompt),'_blank','noopener');
+ });
+ let metar='';
+ root.querySelector('.fetch-metar')?.addEventListener('click',async e=>{
+   const b=e.currentTarget;b.disabled=true;b.textContent='Loading…';
+   try{
+    const [mr,tr]=await Promise.all([
+      fetch(`https://aviationweather.gov/api/data/metar?ids=${encodeURIComponent(x.icao)}&format=raw&hours=2`).then(r=>r.ok?r.text():Promise.reject()),
+      fetch(`https://aviationweather.gov/api/data/taf?ids=${encodeURIComponent(x.icao)}&format=raw`).then(r=>r.ok?r.text():Promise.reject())
+    ]);
+    metar='METAR:\n'+mr.trim()+'\n\nTAF:\n'+tr.trim();
+    root.querySelector('.metar-raw').textContent=metar||'No METAR/TAF returned for this airport.';
+   }catch(err){metar='';root.querySelector('.metar-raw').textContent='Unable to retrieve METAR/TAF. Try the Aviation Weather Center link or check airport coverage.'}
+   b.disabled=false;b.textContent='Refresh METAR / TAF';
+ });
+ root.querySelector('.explain-weather')?.addEventListener('click',()=>{
+   if(!metar){root.querySelector('.fetch-metar')?.click();return}
+   const prompt=`Translate this METAR and TAF for ${x.icao} into a clear operational weather briefing. Explain wind, visibility, weather, cloud/ceiling, temperature/dew point, QNH, trends and validity. Do not add information not present:\n\n${metar}`;
+   window.open('https://chatgpt.com/?q='+encodeURIComponent(prompt),'_blank','noopener');
+ });
+}
 /* airport */
 function steps(x,k,list){
   let out='';list.forEach((s,si)=>{
@@ -75,51 +118,30 @@ function steps(x,k,list){
 function sync(root){const gs={};root.querySelectorAll('.step').forEach(e=>{(gs[e.dataset.g]=gs[e.dataset.g]||[]).push(e);e.classList.remove('next')});
   Object.entries(gs).forEach(([g,a])=>{const f=a.find(e=>!e.classList.contains('done'));if(f)f.classList.add('next');const s=root.querySelector(`.sec[data-g="${g}"] b`);if(s)s.textContent=a.filter(e=>e.classList.contains('done')).length+' / '+a.length})}
 function airport(x){
-  const i=x.info||{},v=k=>(i[k]||'').trim(),ap=!!x.icao,domestic=x.group==='Domestic Briefing';
-  const rw=[...new Set((v('RW').match(/\b\d{1,2}(?=[LRC]*\b)/g)||[]))];
-  const tabs=domestic?[['ov','Overview']]:[['ov','Overview'],...(x.inb&&x.inb.length?[['in','Inbound',x.inb.length]]:[]),...(x.out&&x.out.length?[['out','Outbound',x.out.length]]:[])];
-  const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const strip=s=>String(s||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
-  const sidText=x.sidText||[['SID',v('SID')],['Departure',v('DEP')],['Exit',v('EXIT')]].filter(a=>a[1]).map(a=>a.join(': ')).join('\n')||'No SID or departure-route details are recorded in this airport entry.';
-  const escapeText=x.escapeText||'No escape-route information is included in this airport entry. Use current approved operational documentation.';
-  const sourceText=x.sourceText||strip(x.notes||x.html)||'No additional source sheet is attached to this airport entry.';
-  const modalHtml=`<div class="apt-modal" id="aptModal" aria-hidden="true"><div class="apt-modal-card" role="dialog" aria-modal="true" aria-labelledby="aptModalTitle"><div class="apt-modal-head"><div><div class="sm">${esc(x.icao||x.code)} · ${esc(x.code)}</div><h2 id="aptModalTitle">Airport reference</h2></div><button class="ib" id="aptModalClose" aria-label="Close">×</button></div><div id="aptModalBody" class="apt-modal-body"></div><div class="sm apt-modal-foot">Reference material only · verify current charts, NOTAMs and company procedures before flight.</div></div></div>`;
-  const actionHtml=`<div class="w span"><h4>Quick procedures</h4><div class="apt-actions"><button data-modal="sid">SID / Departure</button><button data-modal="escape">Escape routes</button><button data-modal="source">Full briefing sheet</button></div></div>`;
+  const i=x.info||{},v=k=>(i[k]||'').trim(),ap=!!x.icao,rw=[...new Set((v('RW').match(/\b\d{1,2}(?=[LRC]*\b)/g)||[]))];
+  const tabs=[['ov','Overview'],...(x.inb&&x.inb.length?[['in','Inbound',x.inb.length]]:[]),...(x.out&&x.out.length?[['out','Outbound',x.out.length]]:[])];
   view.innerHTML=`<div class="col"><div class="bar"><a class="ib" href="#" aria-label="Back">‹</a><div>${ap?`<button class="ib pin ${pins.includes(x.id)?'on':''}" aria-label="Pin">★</button>`:''}</div></div>
   <h1 class="t">${x.flag} ${x.code}<br>Briefing</h1><p class="sub">${x.subtitle||''} <span class="chip" style="background:var(--text);color:var(--bg)">${utcLbl(x.tz)}</span>${x.status?` · <span class="chip">${x.status}</span>`:''}</p>
-  ${ap?`<div class="tabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}${t[2]?`<i class="${t[0]}">${t[2]}</i>`:''}</button>`).join('')}<span class="d">${new Date().toUTCString().slice(0,11)}</span></div>`:''}<div id="tb"></div>${modalHtml}</div>`;
+  ${ap?`<div class="tabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}${t[2]?`<i class="${t[0]}">${t[2]}</i>`:''}</button>`).join('')}<span class="d">${new Date().toUTCString().slice(0,11)}</span></div>`:''}<div id="tb"></div></div>`;
   const p=view.querySelector('.pin');if(p)p.onclick=()=>{pins=pins.includes(x.id)?pins.filter(a=>a!==x.id):[...pins,x.id];sv('pins',pins);p.classList.toggle('on')};
-  const tb=$('#tb'),modal=$('#aptModal'),modalBody=$('#aptModalBody'),modalTitle=$('#aptModalTitle');
-  function showModal(kind){
-    modalTitle.textContent=kind==='sid'?'SID / Departure':kind==='escape'?'Escape Routes':'Full briefing sheet';
-    modalBody.innerHTML=`<pre class="source-pre">${esc(kind==='source'?sourceText:kind==='sid'?sidText:escapeText)}</pre>`;
-    modal.classList.add('open');modal.setAttribute('aria-hidden','false');
-  }
-  function closeModal(){modal.classList.remove('open');modal.setAttribute('aria-hidden','true')}
-  view.querySelectorAll('[data-modal]').forEach(b=>b.onclick=()=>showModal(b.dataset.modal));
-  $('#aptModalClose').onclick=closeModal;
-  modal.onclick=e=>{if(e.target===modal)closeModal()};
+  const tb=$('#tb');
   function draw(){onWx=null;
     if(!ap){tb.innerHTML=`<div class="w doc">${x.html}</div>`;return}
-    if(domestic){
-      tb.innerHTML=`<div class="grid g2">
-        <div class="w span"><h4>Airport data</h4><div class="kv">${Object.entries(i).map(([k,a])=>`<div><span>${esc(k)}</span><b>${esc(a)}</b></div>`).join('')}</div></div>
-        <div class="w"><h4>Reference</h4><p class="sm">Domestic airport briefing sheet · 09 Sep 2024. SID / departure, escape routes and the full source sheet are available in the pop-ups below.</p></div>
-        ${actionHtml}
-      </div>`;
-    }else if(tab==='ov'){
-      const rt=['SID','DEP','EXIT'].filter(k=>v(k));
-      const weather=x.lat&&x.lon?wxWidget(x.icao,'span'):'';
-      tb.innerHTML=`<div class="grid g2">${weather}
+    if(tab==='ov'){
+      const rt=['SID','DEP','EXIT'].filter(k=>v(k)&&!(k==='DEP'&&v('DEP')===v('EXIT')));
+      tb.innerHTML=`<div class="grid g2">${LL[x.icao]?wxWidget(x.icao,'span'):''}
       ${x.tz?`<div class="w"><h4>Local time</h4><div style="display:flex;gap:24px"><div><div class="big" data-tz="${x.tz}"></div><div class="sm">Local · ${utcLbl(x.tz)}</div></div><div><div class="big" data-tz="UTC"></div><div class="sm">UTC</div></div></div></div>`:''}
       <div class="w"><h4>Airport</h4><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip" style="background:var(--text);color:var(--bg)">CAT ${x.cat||'—'}</span>${v('TL')?`<span class="chip">TL ${v('TL')}</span>`:''}${v('ELEV')?`<span class="chip">ELEV ${v('ELEV')}</span>`:''}</div><div class="sm" style="margin-top:8px">${x.icao}${v('OPS')?' · '+v('OPS'):''}</div></div>
       ${rw.length?`<div class="w" id="xw"><h4>Wind components<select>${rw.map(r=>`<option value="${r}">RWY ${r}</option>`).join('')}</select></h4><div class="big" id="xw1">—</div><div class="sm" id="xw2">Waiting for weather…</div></div>`:''}
-      ${rt.length?`<div class="w" style="background:var(--gout)"><h4>↗ Departure · exit point</h4><div class="route">${rt.map(k=>`<div><small>${k}</small><span ${k==='EXIT'?'style="font-size:22px"':''}>${v(k)}</span></div>`).join('<span class="a">→</span>')}</div></div>`:''}
+      ${rt.length?`<div class="w" style="background:var(--gout)"><h4>↗ Addis departure · exit point</h4><div class="route">${rt.map(k=>`<div><small>${k}</small><span ${k==='EXIT'?'style="font-size:22px"':''}>${v(k)}</span></div>`).join('<span class="a">→</span>')}</div></div>`:''}
       <div class="w"><h4>Routes</h4><div class="legend"><span style="--c:var(--in)"><a href="#" data-go="in" style="color:inherit">${x.inb.length} inbound</a></span><span style="--c:var(--out)"><a href="#" data-go="out" style="color:inherit">${x.out.length} outbound</a></span></div></div>
-      ${actionHtml}</div>
+      <div class="w span"><h4>Operational procedures</h4><div class="action-row"><button class="action-btn" data-proc="sid">View SIDs / departures ↗</button><button class="action-btn" data-proc="escape">View escape routes ↗</button></div></div></div>
       ${Object.keys(i).length?`<div class="sec"><i style="background:var(--muted)"></i>Airport data</div><div class="w"><div class="kv">${Object.entries(i).map(([k,a])=>`<div><span>${k}</span><b>${a}</b></div>`).join('')}</div></div>`:''}
-      ${x.notes.trim()?`<div class="sec"><i style="background:var(--muted)"></i>Notes</div><div class="w doc">${x.notes}</div>`:''}`;
-      bindWx(tb);clk();
+      ${x.notes.trim()?`<div class="sec"><i style="background:var(--muted)"></i>Notes</div><div class="w doc">${x.notes}</div>`:''}
+      ${notamWeatherPanel(x)}
+      ${x.domesticSource?`<div class="sec"><i style="background:var(--muted)"></i>Domestic briefing · source details</div><details class="w source-details"><summary>Show source-derived airport page</summary><pre>${escHTML(x.domesticSource)}</pre><p class="sm">Source: Airport Information, dated 09 September 2024. Historical company briefing; verify against current approved documentation.</p></details>`:''}`;
+      bindWx(tb);bindNotamWeather(tb,x);clk();
+      tb.querySelectorAll('[data-proc]').forEach(b=>b.onclick=()=>procedureModal(x,b.dataset.proc));
       const xw=$('#xw');if(xw){let m=null;const calc=()=>{const hd=+xw.querySelector('select').value*10,a=$('#xw1'),b=$('#xw2');
         if(!m||m.wspd==null||m.wdir==null||m.wdir==='VRB'){a.textContent='—';b.textContent=m?'Variable or calm wind':'Waiting for weather…';return}
         const r=(m.wdir-hd)*Math.PI/180,hw=Math.round(m.wspd*Math.cos(r)),cw=Math.round(m.wspd*Math.sin(r));
@@ -131,7 +153,7 @@ function airport(x){
       sync(tb);tb.querySelectorAll('.ck').forEach(b=>b.onclick=()=>{const s=b.closest('.step');s.classList.toggle('done');chk[s.dataset.k]=s.classList.contains('done')?1:0;sv('chk',chk);sync(tb)});
       tb.querySelector('.reset').onclick=()=>{tb.querySelectorAll('.step').forEach(s=>{s.classList.remove('done');delete chk[s.dataset.k]});sv('chk',chk);sync(tb)}}}
   view.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;view.querySelectorAll('.tabs button').forEach(c=>c.classList.toggle('on',c===b));draw()});
-  draw();tb.addEventListener('click',e=>{const b=e.target.closest('[data-modal]');if(b)showModal(b.dataset.modal)})}
+  draw()}
 function show(){const x=D.find(d=>d.id===location.hash.slice(1));document.body.classList.remove('open');mark();scrollTo(0,0);tab='ov';
   if(!x)return home();recent=[x.id,...recent.filter(i=>i!==x.id)].slice(0,6);sv('recent',recent);airport(x)}
 $('#q').addEventListener('input',e=>nav(e.target.value));$('#menu').onclick=()=>document.body.classList.toggle('open');
