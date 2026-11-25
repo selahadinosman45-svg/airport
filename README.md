@@ -26,3 +26,9 @@ No repository secrets are needed. GitHub Pages is static hosting, so weather is 
 ## Exit-point escape routes
 
 Airport escape-route pop-ups now include the user-supplied procedures for KONET, TORBA/LAKBE, ALEMU, RUDOL, EKBUL, DAGAP, BRO and ALRAP. Routes are assigned to airport destinations using the recorded EXIT point (including LAKBE→TORBA and MVA→MAV aliases). ARSHI→ASOLE and MAV→ALEMU are shown only as supplied exit-point references because no further routing was provided. EGBIM is likewise identified as an exit point without inventing a route. These are historical/user-supplied operational references and must be checked against current approved company procedures and charts.
+
+
+## Route direction convention
+- Inbound routes are destination-to-Addis Ababa (HAAB), where the route title identifies HAAB as the destination.
+- Outbound routes are Addis Ababa (HAAB)-to-destination, where the route title starts at HAAB.
+- Other non-Addis route segments and generic arrival/departure notes retain their original grouping.
