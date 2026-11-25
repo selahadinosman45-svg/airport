@@ -4,7 +4,28 @@ const ld=(k,f)=>{try{return JSON.parse(localStorage[k])}catch(e){return f}},sv=(
 let pins=ld('pins',[]),recent=ld('recent',[]),chk=ld('chk',{}),tab='ov',onWx=null;
 const plain=v=>{if(v==null)return '';if(typeof v==='string'){const el=document.createElement('div');el.innerHTML=v;return (el.textContent||el.innerText||v).replace(/\s+/g,' ')}if(Array.isArray(v))return v.map(plain).join(' ');if(typeof v==='object')return Object.entries(v).map(([k,val])=>k+' '+plain(val)).join(' ');return String(v)};
 D.forEach(x=>x.text=plain([x.code,x.icao,x.subtitle,x.info,x.html,x.notes,x.sids,x.escape,x.domesticSource,x.inb,x.out,x.exit,x.dep]).toLowerCase());
-const catOf=x=>x.cat||'?',CT=window.CATS||{A:Object.fromEntries(D.filter(x=>x.cat==='A').map(x=>[x.code,x.subtitle||x.code])),B:Object.fromEntries(D.filter(x=>x.cat==='B').map(x=>[x.code,x.subtitle||x.code])),C:Object.fromEntries(D.filter(x=>x.cat==='C').map(x=>[x.code,x.subtitle||x.code]))},LL={HAAB:[8.98,38.80]};AP.forEach(x=>{if(Number.isFinite(+x.lat)&&Number.isFinite(+x.lon))LL[x.icao]=[+x.lat,+x.lon]});
+/* Build category counts from the supplied FOM category reference sheet, not only airport records. */
+const categorySheet=D.find(x=>x.id==='categories'||x.code==='Categories');
+const categoryMap={},categoryNames={A:{},B:{},C:{}};
+if(categorySheet&&categorySheet.html){
+  const sectionRe=/<h3>\s*Category\s+([ABC])\s*<\/h3>([\s\S]*?)(?=<h3>\s*Category\s+[ABC]\s*<\/h3>|$)/gi;
+  let section;
+  while((section=sectionRe.exec(categorySheet.html))){
+    const cat=section[1].toUpperCase(),body=section[2];
+    const itemRe=/<div><span>([\s\S]*?)<\/span><b>([A-Z0-9]{3,4})<\/b><\/div>/gi;
+    let item;
+    while((item=itemRe.exec(body))){
+      const name=item[1].replace(/<[^>]*>/g,'').trim(),icao=item[2].trim().toUpperCase();
+      categoryMap[icao]=cat;categoryNames[cat][icao]=name;
+    }
+  }
+}
+D.forEach(x=>{if(x.icao&&categoryMap[String(x.icao).toUpperCase()])x.cat=categoryMap[String(x.icao).toUpperCase()]});
+const catOf=x=>x.cat||'?',CT=window.CATS||{
+ A:Object.fromEntries(Object.entries(categoryNames.A).map(([icao,name])=>[icao,name])),
+ B:Object.fromEntries(Object.entries(categoryNames.B).map(([icao,name])=>[icao,name])),
+ C:Object.fromEntries(Object.entries(categoryNames.C).map(([icao,name])=>[icao,name]))
+},LL={HAAB:[8.98,38.80]};AP.forEach(x=>{if(Number.isFinite(+x.lat)&&Number.isFinite(+x.lon))LL[x.icao]=[+x.lat,+x.lon]});
 
 /* splash + theme */
 const sp=$('#splash');let seen=false;try{seen=sessionStorage.seen}catch(e){}
