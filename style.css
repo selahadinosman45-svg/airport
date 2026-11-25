@@ -58,7 +58,6 @@ select{font:inherit;background:rgba(127,135,148,.14);color:var(--text);border:0;
 .action-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 .action-btn{border:1px solid var(--line);background:var(--text);color:var(--bg);padding:10px 14px;border-radius:12px;font-weight:650;font-size:13px}
 .action-btn:disabled{opacity:.55}
-.notam-input{width:100%;resize:vertical;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);font:13px/1.5 ui-monospace,monospace}
 .metar-raw,.source-details pre,.proc-body pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.65 ui-monospace,SFMono-Regular,monospace;color:var(--text);margin:12px 0 0}
 .source-details summary{cursor:pointer;font-weight:650}
 .proc-overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.68);display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(8px)}

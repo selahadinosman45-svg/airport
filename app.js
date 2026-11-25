@@ -75,35 +75,22 @@ function procedureModal(x,kind){
   overlay.querySelector('.proc-close').onclick=()=>overlay.remove();
   overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
 }
-function notamWeatherPanel(x){
-  const q=encodeURIComponent(`Explain these aviation NOTAMs for ${x.icao} in plain language. Preserve runway, taxiway, navaid, time, altitude, and validity details. Flag anything safety-critical and do not infer missing information.`);
-  return `<div class="w span"><h4>NOTAM briefing · ${x.icao}</h4><p class="sm">Live NOTAM availability depends on the official provider and region. Open the official search, then paste the NOTAM text below for an AI-assisted plain-language explanation.</p><p><a href="https://www.notams.faa.gov/dinsQueryWeb/" target="_blank" rel="noopener">FAA NOTAM search ↗</a> · <a href="https://www.eurocontrol.int/service/european-ais-database" target="_blank" rel="noopener">European AIS database ↗</a></p><textarea class="notam-input" placeholder="Paste NOTAM text here…" rows="3"></textarea><div class="action-row"><button class="action-btn explain-notam">Explain NOTAM with ChatGPT ↗</button><span class="sm">AI explanation requires an internet connection and your confirmation in ChatGPT.</span></div></div>
-  <div class="w span"><h4>Weather briefing · METAR / TAF</h4><p class="sm">Fetch the latest available raw METAR and TAF from Aviation Weather Center. Use the AI action to translate abbreviations into plain language.</p><div class="action-row"><button class="action-btn fetch-metar">Fetch METAR / TAF</button><button class="action-btn explain-weather">Explain weather with ChatGPT ↗</button></div><pre class="metar-raw sm">METAR / TAF not fetched yet.</pre></div>`;
+function weatherPanel(x){
+  return `<div class="w span"><h4>Weather briefing · METAR / TAF</h4><p class="sm">Load the latest available raw METAR and TAF for this airport.</p><div class="action-row"><button class="action-btn fetch-metar">Fetch METAR / TAF</button></div><pre class="metar-raw sm">METAR / TAF not fetched yet.</pre></div>`;
 }
-function bindNotamWeather(root,x){
- const ni=root.querySelector('.notam-input');
- root.querySelector('.explain-notam')?.addEventListener('click',()=>{
-   const val=ni.value.trim();if(!val){ni.focus();return}
-   const prompt=`Explain this NOTAM for ${x.icao} in plain language. Keep all operational details exact, identify affected facilities and validity, and clearly mark uncertainty. Do not invent missing data:\n\n${val}`;
-   window.open('https://chatgpt.com/?q='+encodeURIComponent(prompt),'_blank','noopener');
- });
- let metar='';
+const LIVE_DATA_URL=window.AIRPORT_LIVE_DATA_URL||'./live-briefings.json';
+let liveBriefings=null;
+async function getLiveBriefings(){
+ if(!liveBriefings){const r=await fetch(LIVE_DATA_URL,{cache:'no-store'});if(!r.ok)throw new Error('GitHub Actions has not published weather data yet.');liveBriefings=await r.json();}
+ return liveBriefings;
+}
+function bindWeather(root,x){
  root.querySelector('.fetch-metar')?.addEventListener('click',async e=>{
-   const b=e.currentTarget;b.disabled=true;b.textContent='Loading…';
-   try{
-    const [mr,tr]=await Promise.all([
-      fetch(`https://aviationweather.gov/api/data/metar?ids=${encodeURIComponent(x.icao)}&format=raw&hours=2`).then(r=>r.ok?r.text():Promise.reject()),
-      fetch(`https://aviationweather.gov/api/data/taf?ids=${encodeURIComponent(x.icao)}&format=raw`).then(r=>r.ok?r.text():Promise.reject())
-    ]);
-    metar='METAR:\n'+mr.trim()+'\n\nTAF:\n'+tr.trim();
-    root.querySelector('.metar-raw').textContent=metar||'No METAR/TAF returned for this airport.';
-   }catch(err){metar='';root.querySelector('.metar-raw').textContent='Unable to retrieve METAR/TAF. Try the Aviation Weather Center link or check airport coverage.'}
-   b.disabled=false;b.textContent='Refresh METAR / TAF';
- });
- root.querySelector('.explain-weather')?.addEventListener('click',()=>{
-   if(!metar){root.querySelector('.fetch-metar')?.click();return}
-   const prompt=`Translate this METAR and TAF for ${x.icao} into a clear operational weather briefing. Explain wind, visibility, weather, cloud/ceiling, temperature/dew point, QNH, trends and validity. Do not add information not present:\n\n${metar}`;
-   window.open('https://chatgpt.com/?q='+encodeURIComponent(prompt),'_blank','noopener');
+  const b=e.currentTarget;b.disabled=true;b.textContent='Loading…';
+  try{const d=await getLiveBriefings(),a=d.airports?.[x.icao];if(!a)throw new Error('No published weather for this airport yet.');
+   const w=a.weather||{};root.querySelector('.metar-raw').textContent=`METAR:\n${w.metar||'Not available'}\n\nTAF:\n${w.taf||'Not available'}\n\nLast GitHub refresh: ${new Date(a.fetchedAt||d.generatedAt).toLocaleString()}`;
+  }catch(err){root.querySelector('.metar-raw').textContent=err.message}
+  b.disabled=false;b.textContent='Refresh METAR / TAF';
  });
 }
 /* airport */
@@ -138,9 +125,9 @@ function airport(x){
       <div class="w span"><h4>Operational procedures</h4><div class="action-row"><button class="action-btn" data-proc="sid">View SIDs / departures ↗</button><button class="action-btn" data-proc="escape">View escape routes ↗</button></div></div></div>
       ${Object.keys(i).length?`<div class="sec"><i style="background:var(--muted)"></i>Airport data</div><div class="w"><div class="kv">${Object.entries(i).map(([k,a])=>`<div><span>${k}</span><b>${a}</b></div>`).join('')}</div></div>`:''}
       ${x.notes.trim()?`<div class="sec"><i style="background:var(--muted)"></i>Notes</div><div class="w doc">${x.notes}</div>`:''}
-      ${notamWeatherPanel(x)}
+      ${weatherPanel(x)}
       ${x.domesticSource?`<div class="sec"><i style="background:var(--muted)"></i>Domestic briefing · source details</div><details class="w source-details"><summary>Show source-derived airport page</summary><pre>${escHTML(x.domesticSource)}</pre><p class="sm">Source: Airport Information, dated 09 September 2024. Historical company briefing; verify against current approved documentation.</p></details>`:''}`;
-      bindWx(tb);bindNotamWeather(tb,x);clk();
+      bindWx(tb);bindWeather(tb,x);clk();
       tb.querySelectorAll('[data-proc]').forEach(b=>b.onclick=()=>procedureModal(x,b.dataset.proc));
       const xw=$('#xw');if(xw){let m=null;const calc=()=>{const hd=+xw.querySelector('select').value*10,a=$('#xw1'),b=$('#xw2');
         if(!m||m.wspd==null||m.wdir==null||m.wdir==='VRB'){a.textContent='—';b.textContent=m?'Variable or calm wind':'Waiting for weather…';return}
