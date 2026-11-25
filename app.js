@@ -98,24 +98,6 @@ function procedureModal(x,kind){
   overlay.querySelector('.proc-close').onclick=()=>overlay.remove();
   overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
 }
-function weatherPanel(x){
-  return `<div class="w span"><h4>Weather briefing · METAR / TAF</h4><p class="sm">Load the latest available raw METAR and TAF for this airport.</p><div class="action-row"><button class="action-btn fetch-metar">Fetch METAR / TAF</button></div><pre class="metar-raw sm">METAR / TAF not fetched yet.</pre></div>`;
-}
-const LIVE_DATA_URL=window.AIRPORT_LIVE_DATA_URL||'./live-briefings.json';
-let liveBriefings=null;
-async function getLiveBriefings(){
- if(!liveBriefings){const r=await fetch(LIVE_DATA_URL,{cache:'no-store'});if(!r.ok)throw new Error('GitHub Actions has not published weather data yet.');liveBriefings=await r.json();}
- return liveBriefings;
-}
-function bindWeather(root,x){
- root.querySelector('.fetch-metar')?.addEventListener('click',async e=>{
-  const b=e.currentTarget;b.disabled=true;b.textContent='Loading…';
-  try{const d=await getLiveBriefings(),a=d.airports?.[x.icao];if(!a)throw new Error('No published weather for this airport yet.');
-   const w=a.weather||{};root.querySelector('.metar-raw').textContent=`METAR:\n${w.metar||'Not available'}\n\nTAF:\n${w.taf||'Not available'}\n\nLast GitHub refresh: ${new Date(a.fetchedAt||d.generatedAt).toLocaleString()}`;
-  }catch(err){root.querySelector('.metar-raw').textContent=err.message}
-  b.disabled=false;b.textContent='Refresh METAR / TAF';
- });
-}
 /* airport */
 function steps(x,k,list){
   let out='';list.forEach((s,si)=>{
@@ -148,8 +130,8 @@ function airport(x){
       <div class="w span"><h4>Operational procedures</h4><div class="action-row"><button class="action-btn" data-proc="sid">View SIDs / departures ↗</button><button class="action-btn" data-proc="escape">View escape routes ↗</button></div></div></div>
       ${x.group==='Domestic Briefing'?domesticBriefingPanel(x):(Object.keys(i).length?`<div class="sec"><i style="background:var(--muted)"></i>Airport data</div><div class="w"><div class="kv">${Object.entries(i).map(([k,a])=>`<div><span>${k}</span><b>${a}</b></div>`).join('')}</div></div>`:'')}
       ${x.notes.trim()?`<div class="sec"><i style="background:var(--muted)"></i>Notes</div><div class="w doc">${x.notes}</div>`:''}
-      ${weatherPanel(x)}`;
-      bindWx(tb);bindWeather(tb,x);clk();
+      `;
+      bindWx(tb);clk();
       tb.querySelectorAll('[data-proc]').forEach(b=>b.onclick=()=>procedureModal(x,b.dataset.proc));
       const xw=$('#xw');if(xw){let m=null;const calc=()=>{const hd=+xw.querySelector('select').value*10,a=$('#xw1'),b=$('#xw2');
         if(!m||m.wspd==null||m.wdir==null||m.wdir==='VRB'){a.textContent='—';b.textContent=m?'Variable or calm wind':'Waiting for weather…';return}
