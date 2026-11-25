@@ -3,7 +3,7 @@ const AWC='https://aviationweather.gov/api/data/',AP=D.filter(x=>x.icao);
 const ld=(k,f)=>{try{return JSON.parse(localStorage[k])}catch(e){return f}},sv=(k,v)=>{try{localStorage[k]=JSON.stringify(v)}catch(e){}};
 let pins=ld('pins',[]),recent=ld('recent',[]),chk=ld('chk',{}),tab='ov',onWx=null;
 D.forEach(x=>x.text=(x.code+' '+x.icao+' '+x.subtitle+' '+(x.html||'').replace(/<[^>]+>/g,' ')).toLowerCase());
-const catOf=x=>x.cat||'?',CT=window.CATS,LL={HAAB:[8.98,38.80]};AP.forEach(x=>LL[x.icao]=[x.lat,x.lon]);
+const catOf=x=>x.cat||'?',CT=window.CATS||{A:Object.fromEntries(D.filter(x=>x.cat==='A').map(x=>[x.code,x.subtitle||x.code])),B:Object.fromEntries(D.filter(x=>x.cat==='B').map(x=>[x.code,x.subtitle||x.code])),C:Object.fromEntries(D.filter(x=>x.cat==='C').map(x=>[x.code,x.subtitle||x.code]))},LL={HAAB:[8.98,38.80]};AP.forEach(x=>{if(Number.isFinite(+x.lat)&&Number.isFinite(+x.lon))LL[x.icao]=[+x.lat,+x.lon]});
 
 /* splash + theme */
 const sp=$('#splash');let seen=false;try{seen=sessionStorage.seen}catch(e){}
