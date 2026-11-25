@@ -56,7 +56,7 @@ select{font:inherit;background:rgba(127,135,148,.14);color:var(--text);border:0;
 
 /* Operational procedure pop-ups and briefing tools */
 .action-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-.action-btn{border:1px solid var(--line);background:var(--text);color:var(--bg);padding:10px 14px;border-radius:12px;font-weight:650;font-size:13px}
+.action-btn{border:0;background:rgba(127,135,148,.14);color:var(--text);padding:12px 18px;border-radius:16px;font-weight:650;font-size:13px;box-shadow:var(--sh);transition:transform .15s,background .15s}.action-btn:hover{background:rgba(127,135,148,.22);transform:translateY(-1px)}.action-btn:active{transform:scale(.98)}
 .action-btn:disabled{opacity:.55}
 .metar-raw,.source-details pre,.proc-body pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.65 ui-monospace,SFMono-Regular,monospace;color:var(--text);margin:12px 0 0}
 .source-details summary{cursor:pointer;font-weight:650}
@@ -68,3 +68,15 @@ select{font:inherit;background:rgba(127,135,148,.14);color:var(--text);border:0;
 .proc-body pre{font-size:14px}
 .proc-body .sm{margin-top:16px}
 @media(max-width:640px){.action-btn{flex:1}.proc-overlay{padding:10px}.proc-modal{max-height:88vh;border-radius:18px}}
+
+/* Domestic briefing cards — matched to the original soft, rounded airport UI */
+.domestic-card{background:var(--card);border-radius:28px;padding:20px;box-shadow:var(--sh);margin-bottom:16px}
+.domestic-card-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.domestic-card-title h3{font-size:23px;line-height:1.2;margin:3px 0 0;letter-spacing:-.03em}
+.source-date{font-size:10px;font-weight:700;letter-spacing:.09em;color:var(--muted);background:rgba(127,135,148,.13);padding:7px 10px;border-radius:99px;white-space:nowrap}
+.domestic-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.domestic-data{min-width:0;background:rgba(127,135,148,.12);border-radius:20px;padding:14px 16px}
+.domestic-data h4{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:700}
+.domestic-data pre{white-space:pre-wrap;overflow-wrap:anywhere;font:600 13px/1.55 Inter,system-ui,sans-serif;margin:0;color:var(--text)}
+.domestic-warning{margin:14px 2px 0;line-height:1.5}
+@media(max-width:560px){.domestic-card{padding:15px;border-radius:23px}.domestic-card-grid{grid-template-columns:1fr}.domestic-data{border-radius:17px}.domestic-card-title h3{font-size:20px}}

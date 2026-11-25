@@ -14,3 +14,11 @@ GitHub Actions retrieves publicly available METAR and TAF reports from the Aviat
 4. Run **Actions → Refresh airport weather briefings → Run workflow** once to create the initial `live-briefings.json`.
 
 No repository secrets are needed. GitHub Pages is static hosting, so weather is published as a scheduled snapshot and may be delayed by Actions queue/runtime time. METAR/TAF availability depends on upstream coverage for each airport. Always consult official operational sources and current approved documentation.
+
+## Domestic briefing cards and escape-route reference
+
+- Domestic Briefing airports are shown individually and now use a structured, rounded briefing card rather than the generic SOURCE / RWY placeholder tiles.
+- Each domestic card is populated from the supplied *Airport Information* PDF dated 09 September 2024, with runway/minima, MSA/MAP/frequencies, elevation data, route procedures and depressurization escape-route text grouped into readable panels.
+- Every international airport page retains an Escape Routes pop-up. Where a complete airport-specific escape route exists in the supplied records, it is shown. Where only an exit point is available, the pop-up identifies that exit point and explicitly states that the full route was not supplied; no route is invented from an exit fix alone.
+- Buttons use the original soft, rounded neutral styling in light and dark themes.
+- All source procedures are historical operational references and must be checked against current approved charts and company documentation before use.

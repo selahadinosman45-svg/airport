@@ -65,9 +65,36 @@ function home(){
 
 /* source-grounded operational pop-ups */
 const escHTML=s=>String(s||'Not provided in the supplied briefing.').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function domesticSection(raw,kind){
+  const text=String(raw||'');
+  if(!text)return 'No domestic airport source details are available.';
+  if(kind==='escape'){
+    const m=text.match(/Depressurization escape route[\s\S]*?(?=\nFire\b|$)/i);
+    return m?m[0].trim():'No depressurization escape-route text was present in this airport source.';
+  }
+  const m=text.match(/ADD\s*[–-][\s\S]*?(?=\nFIX\b|\nETP\s+PNR\b|\nDepressurization escape route|$)/i);
+  return m?m[0].trim():'No SID / route details were present in this airport source.';
+}
+function domesticBriefingPanel(x){
+  const raw=String(x.domesticSource||'');
+  const section=(start,end)=>{const a=raw.search(start);if(a<0)return '';const rest=raw.slice(a);const b=end?rest.search(end):-1;return rest.slice(0,b<0?undefined:b).trim()};
+  const blocks=[
+    ['Runway & minima',section(/\bRWY\b/i,/\nMSA\b/i)],
+    ['MSA · MAP · Frequencies',section(/\bMSA\b/i,/\nGrid Mora\b/i)],
+    ['Airport elevations',section(/Grid Mora/i,/\nADD\s*[–-]/i)],
+    ['Routes & procedures',section(/ADD\s*[–-]/i,/\nDepressurization escape route/i)],
+    ['Depressurization escape route',domesticSection(raw,'escape')]
+  ].filter(a=>a[1]);
+  return `<div class="sec"><i style="background:var(--muted)"></i>Domestic briefing · source card</div>
+  <div class="domestic-card"><div class="domestic-card-title"><div><div class="sm">${escHTML(x.subtitle||x.code)}</div><h3>${escHTML(x.code)} · ${escHTML(x.icao)}</h3></div><span class="source-date">09 SEP 2024</span></div>
+  <div class="domestic-card-grid">${blocks.map(([h,v])=>`<section class="domestic-data"><h4>${h}</h4><pre>${escHTML(v)}</pre></section>`).join('')}</div>
+  <p class="sm domestic-warning">Source: Airport Information, 09 September 2024. Historical reference only; verify all runway, minima, route and escape procedures against current approved charts and company documentation.</p></div>`;
+}
 function procedureModal(x,kind){
   const title=kind==='sid'?'SIDs / departure procedures':'Escape routes';
-  const value=kind==='sid'?(x.sids||x.info?.SID||'No SID details were provided in the source briefing.'):(x.escape||'No airport-specific escape route was supplied. Check the Addis FIR escape-route briefing and current company procedures.');
+  const isDomestic=x.group==='Domestic Briefing';
+  const exitPoint=x.exit||x.info?.EXIT||x.info?.DEP||'';
+  const value=kind==='sid'?(x.sids||x.info?.SID||(isDomestic?domesticSection(x.domesticSource,'routes'):'No SID details were provided in the source briefing.')):(x.escape|| (isDomestic?domesticSection(x.domesticSource,'escape'):x.exit?`Identified departure/flight-plan exit point: ${x.exit}.\n\nThe supplied airport briefing does not contain a complete depressurization escape-route procedure for this destination. The exit point alone is not sufficient to construct a safe route. Use current approved company escape-route documentation and charts.`:'No exit point or complete escape-route procedure is present in the supplied airport records. Do not infer a route.'));
   const old=document.querySelector('.proc-overlay');if(old)old.remove();
   const overlay=document.createElement('div');overlay.className='proc-overlay';
   overlay.innerHTML=`<div class="proc-modal" role="dialog" aria-modal="true" aria-label="${title}"><div class="proc-head"><div><div class="sm">${x.code} · ${x.icao}</div><h2>${title}</h2></div><button class="ib proc-close" aria-label="Close">×</button></div><div class="proc-body"><pre>${escHTML(value)}</pre><p class="sm">Operational reference only. Confirm current AIP charts, NOTAMs, aircraft performance and company-approved procedures before flight.</p></div></div>`;
@@ -118,15 +145,14 @@ function airport(x){
       const rt=['SID','DEP','EXIT'].filter(k=>v(k)&&!(k==='DEP'&&v('DEP')===v('EXIT')));
       tb.innerHTML=`<div class="grid g2">${LL[x.icao]?wxWidget(x.icao,'span'):''}
       ${x.tz?`<div class="w"><h4>Local time</h4><div style="display:flex;gap:24px"><div><div class="big" data-tz="${x.tz}"></div><div class="sm">Local · ${utcLbl(x.tz)}</div></div><div><div class="big" data-tz="UTC"></div><div class="sm">UTC</div></div></div></div>`:''}
-      <div class="w"><h4>Airport</h4><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip" style="background:var(--text);color:var(--bg)">CAT ${x.cat||'—'}</span>${v('TL')?`<span class="chip">TL ${v('TL')}</span>`:''}${v('ELEV')?`<span class="chip">ELEV ${v('ELEV')}</span>`:''}</div><div class="sm" style="margin-top:8px">${x.icao}${v('OPS')?' · '+v('OPS'):''}</div></div>
+      ${x.group==='Domestic Briefing'?'':`<div class="w"><h4>Airport</h4><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip" style="background:var(--text);color:var(--bg)">CAT ${x.cat||'—'}</span>${v('TL')?`<span class="chip">TL ${v('TL')}</span>`:''}${v('ELEV')?`<span class="chip">ELEV ${v('ELEV')}</span>`:''}</div><div class="sm" style="margin-top:8px">${x.icao}${v('OPS')?' · '+v('OPS'):''}</div></div>`}
       ${rw.length?`<div class="w" id="xw"><h4>Wind components<select>${rw.map(r=>`<option value="${r}">RWY ${r}</option>`).join('')}</select></h4><div class="big" id="xw1">—</div><div class="sm" id="xw2">Waiting for weather…</div></div>`:''}
       ${rt.length?`<div class="w" style="background:var(--gout)"><h4>↗ Addis departure · exit point</h4><div class="route">${rt.map(k=>`<div><small>${k}</small><span ${k==='EXIT'?'style="font-size:22px"':''}>${v(k)}</span></div>`).join('<span class="a">→</span>')}</div></div>`:''}
-      <div class="w"><h4>Routes</h4><div class="legend"><span style="--c:var(--in)"><a href="#" data-go="in" style="color:inherit">${x.inb.length} inbound</a></span><span style="--c:var(--out)"><a href="#" data-go="out" style="color:inherit">${x.out.length} outbound</a></span></div></div>
+      ${x.group==='Domestic Briefing'?'':`<div class="w"><h4>Routes</h4><div class="legend"><span style="--c:var(--in)"><a href="#" data-go="in" style="color:inherit">${x.inb.length} inbound</a></span><span style="--c:var(--out)"><a href="#" data-go="out" style="color:inherit">${x.out.length} outbound</a></span></div></div>`}
       <div class="w span"><h4>Operational procedures</h4><div class="action-row"><button class="action-btn" data-proc="sid">View SIDs / departures ↗</button><button class="action-btn" data-proc="escape">View escape routes ↗</button></div></div></div>
-      ${Object.keys(i).length?`<div class="sec"><i style="background:var(--muted)"></i>Airport data</div><div class="w"><div class="kv">${Object.entries(i).map(([k,a])=>`<div><span>${k}</span><b>${a}</b></div>`).join('')}</div></div>`:''}
+      ${x.group==='Domestic Briefing'?domesticBriefingPanel(x):(Object.keys(i).length?`<div class="sec"><i style="background:var(--muted)"></i>Airport data</div><div class="w"><div class="kv">${Object.entries(i).map(([k,a])=>`<div><span>${k}</span><b>${a}</b></div>`).join('')}</div></div>`:'')}
       ${x.notes.trim()?`<div class="sec"><i style="background:var(--muted)"></i>Notes</div><div class="w doc">${x.notes}</div>`:''}
-      ${weatherPanel(x)}
-      ${x.domesticSource?`<div class="sec"><i style="background:var(--muted)"></i>Domestic briefing · source details</div><details class="w source-details"><summary>Show source-derived airport page</summary><pre>${escHTML(x.domesticSource)}</pre><p class="sm">Source: Airport Information, dated 09 September 2024. Historical company briefing; verify against current approved documentation.</p></details>`:''}`;
+      ${weatherPanel(x)}`;
       bindWx(tb);bindWeather(tb,x);clk();
       tb.querySelectorAll('[data-proc]').forEach(b=>b.onclick=()=>procedureModal(x,b.dataset.proc));
       const xw=$('#xw');if(xw){let m=null;const calc=()=>{const hd=+xw.querySelector('select').value*10,a=$('#xw1'),b=$('#xw2');
