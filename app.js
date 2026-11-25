@@ -2,7 +2,8 @@ const D=window.BRIEFINGS,$=s=>document.querySelector(s),list=$('#list'),view=$('
 const AWC='https://aviationweather.gov/api/data/',AP=D.filter(x=>x.icao);
 const ld=(k,f)=>{try{return JSON.parse(localStorage[k])}catch(e){return f}},sv=(k,v)=>{try{localStorage[k]=JSON.stringify(v)}catch(e){}};
 let pins=ld('pins',[]),recent=ld('recent',[]),chk=ld('chk',{}),tab='ov',onWx=null;
-D.forEach(x=>x.text=(x.code+' '+x.icao+' '+x.subtitle+' '+(x.html||'').replace(/<[^>]+>/g,' ')).toLowerCase());
+const plain=v=>{if(v==null)return '';if(typeof v==='string'){const el=document.createElement('div');el.innerHTML=v;return (el.textContent||el.innerText||v).replace(/\s+/g,' ')}if(Array.isArray(v))return v.map(plain).join(' ');if(typeof v==='object')return Object.entries(v).map(([k,val])=>k+' '+plain(val)).join(' ');return String(v)};
+D.forEach(x=>x.text=plain([x.code,x.icao,x.subtitle,x.info,x.html,x.notes,x.sids,x.escape,x.domesticSource,x.inb,x.out,x.exit,x.dep]).toLowerCase());
 const catOf=x=>x.cat||'?',CT=window.CATS||{A:Object.fromEntries(D.filter(x=>x.cat==='A').map(x=>[x.code,x.subtitle||x.code])),B:Object.fromEntries(D.filter(x=>x.cat==='B').map(x=>[x.code,x.subtitle||x.code])),C:Object.fromEntries(D.filter(x=>x.cat==='C').map(x=>[x.code,x.subtitle||x.code]))},LL={HAAB:[8.98,38.80]};AP.forEach(x=>{if(Number.isFinite(+x.lat)&&Number.isFinite(+x.lon))LL[x.icao]=[+x.lat,+x.lon]});
 
 /* splash + theme */
@@ -41,7 +42,7 @@ setInterval(clk,15000);
 /* nav */
 function nav(q=''){q=q.toLowerCase().trim();let out='',g='';
   D.filter(x=>!q||x.text.includes(q)).forEach(x=>{if(x.group!==g){g=x.group;out+=`<h2>${g}</h2>`}out+=`<a href="#${x.id}" data-id="${x.id}">${x.flag} <span>${x.code}</span><small>${x.icao}</small></a>`});
-  list.innerHTML=out||'<p class="empty">No matches</p>';mark()}
+  list.innerHTML=out||'<p class="empty">No matches</p>';if(q&&window.matchMedia('(max-width: 780px)').matches)document.body.classList.add('open');mark()}
 const mark=()=>list.querySelectorAll('a').forEach(a=>a.classList.toggle('on',a.dataset.id===location.hash.slice(1)));
 
 /* home */
